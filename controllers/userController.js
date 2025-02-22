@@ -4,7 +4,9 @@ import { prisma } from "../prisma/client.js"
 import jwt from "jsonwebtoken"
 import { sendEmail } from "../utils/mailer.js"
 import path from "path"
-import { performSymptopChecknalysis } from "../ai/function.js"
+import { performPresriptionScheduling, performSymptopChecknalysis } from "../ai/function.js"
+import sharp from "sharp"
+import fs from "fs/promises"
 
 export const getUserDetails = (req, res, next) => {
   try {
@@ -128,7 +130,11 @@ export const getAIAnalysis = async (req, res, next) => {
         files.push(webpBuffer.toString('base64'));
       }
     }
-    const data = await performSymptopChecknalysis({ data: { ...req.body, user }, files })
+    const prompt = JSON.parse(req.body.prompt)
+    const data = await performSymptopChecknalysis({ data: { ...prompt, user }, files })
+    if (data.err) {
+      return res.status(400).json({ err: data.err })
+    }
     await prisma.symptomAnalysis.create({
       data: {
         user: {
@@ -142,6 +148,54 @@ export const getAIAnalysis = async (req, res, next) => {
         title: data.title
       }
     })
+    res.json({ data });
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const getAIPrescriptionSchedule = async (req, res, next) => {
+  try {
+    const { user } = res.locals
+    let imageBase64 = null
+    if (req.files?.image) {
+      const imageBuffer = req.files.image.data
+      const webpBuffer = await sharp(imageBuffer)
+        .webp()
+        .toBuffer()
+      imageBase64 = webpBuffer.toString('base64')
+    }
+    const prescription = req.body.prescription ? JSON.parse(req.body.prescription) : "Check the attached image"
+    const response = await performPresriptionScheduling({ data: { prescription, user }, file: imageBase64, date: new Date().toDateString() })
+    if (response.err) {
+      return res.status(400).json({ err: response.err })
+    }
+    await prisma.prescriptions.createMany({
+      data: response.result.map(item => ({
+        drugName: item.drugName,
+        frequency: item.frequency,
+        dates: item.dates.map(d => new Date(d)),
+        ics: item.ics,
+        userId: user.id
+      }))
+    })
+    const icsFileContent = response.combinedICS;
+    const tempFilePath = `/tmp/prescription_${Date.now()}.ics`;
+    await fs.writeFile(tempFilePath, icsFileContent);
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Your Prescription Schedule',
+      template: './templates/prescriptionSchedule.ejs',
+      data: { name: user.name },
+      attachments: [{
+        filename: 'prescription_schedule.ics',
+        path: tempFilePath
+      }]
+    });
+
+    await fs.unlink(tempFilePath);
+    res.json({ message: 'Prescription schedule sent successfully' });
   } catch (error) {
     next(error)
   }

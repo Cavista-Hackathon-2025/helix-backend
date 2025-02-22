@@ -16,4 +16,8 @@ NOTE: Your response must be very very detailed. and catching of errors must be s
   `
 }
 
+export function prescriptionSchedulingPromt(data) {
+  return `Data: ${JSON.stringify(data)}`
+}
+
 
