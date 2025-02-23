@@ -1,7 +1,6 @@
 import model, { prescriptionSchedulingPromt, symptomPromptGenerator } from "./model.js"
 
 export async function performSymptopChecknalysis({ user, data, files }) {
-  console
   //Generate the prompt ensure the data has the medication data
   const promptData = symptomPromptGenerator({ ...data, user })
   let messages = [

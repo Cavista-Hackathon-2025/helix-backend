@@ -50,11 +50,14 @@ model Prescriptions {
 }
 
 model SymptomAnalysis {
-  id       BigInt  @id @default(autoincrement())
-  diets    Json
-  advice   Json
-  response String  @db.Text
-  title    String?
-  user     User    @relation(fields: [userId], references: [id])
-  userId   BigInt
+  id        BigInt   @id @default(autoincrement())
+  diets     Json
+  advice    Json
+  response  String   @db.Text
+  title     String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    BigInt
+  severity  String?
+  symptoms  String[]
+  createdAt DateTime @default(now())
 }

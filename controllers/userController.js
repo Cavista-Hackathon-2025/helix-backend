@@ -137,15 +137,13 @@ export const getAIAnalysis = async (req, res, next) => {
     }
     const analysis = await prisma.symptomAnalysis.create({
       data: {
-        user: {
-          connect: {
-            id: user.id
-          }
-        },
+        userId: user.id,
         advice: data.advice,
         diets: data.diets,
         response: data.response,
-        title: data.title
+        title: data.title,
+        symptoms: data.symptoms,
+        severity: data.severity
       }
     })
     res.json({ data: analysis });
@@ -196,6 +194,57 @@ export const getAIPrescriptionSchedule = async (req, res, next) => {
 
     await fs.unlink(tempFilePath);
     res.json({ message: 'Prescription schedule sent successfully' });
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const fetchDiagnosisHistory = async (req, res, next) => {
+  try {
+    const { user } = res.locals
+    console.log(user)
+
+    const page = parseInt(req.query.page) || 1
+    const perPage = 3
+    const skip = (page - 1) * perPage
+
+    const [diagnosisHistory, total] = await Promise.all([
+      prisma.symptomAnalysis.findMany({
+        where: {
+          userId: user.id
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: perPage,
+        skip: skip,
+        select: {
+          title: true,
+          id: true,
+          symptoms: true,
+          severity: true,
+          createdAt: true,
+        }
+      }),
+      prisma.symptomAnalysis.count({
+        where: {
+          userId: user.id
+        }
+      })
+    ])
+
+    const totalPages = Math.ceil(total / perPage)
+
+
+    res.json({
+      diagnosisHistory,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalRecords: total,
+        hasMore: page < totalPages
+      }
+    })
   } catch (error) {
     next(error)
   }
