@@ -7,6 +7,7 @@ import path from "path"
 import { performPresriptionScheduling, performSymptopChecknalysis } from "../ai/function.js"
 import sharp from "sharp"
 import fs from "fs/promises"
+import axios from "axios"
 
 export const getUserDetails = (req, res, next) => {
   try {
@@ -89,11 +90,11 @@ export const setMedicals = async (req, res, next) => {
         userId: user.id
       },
       data: {
-        weight,
-        height,
+        weight: weight ? Number(weight) : undefined,
+        height: height ? Number(height) : undefined,
         blood_pressure,
         alergies,
-        history
+        history: history ? JSON.parse(history) : undefined
       }
     })
     const updatedUser = await prisma.user.findUnique({
@@ -205,7 +206,7 @@ export const fetchDiagnosisHistory = async (req, res, next) => {
     console.log(user)
 
     const page = parseInt(req.query.page) || 1
-    const perPage = 3
+    const perPage = 10
     const skip = (page - 1) * perPage
 
     const [diagnosisHistory, total] = await Promise.all([
@@ -270,3 +271,86 @@ export const fetchSingleDignosisHistory = async (req, res, next) => {
     next(error)
   }
 }
+
+export const getGoogleKey = async (req, res, next) => {
+  try {
+    return res.json({
+      projectId: process.env.GOOGLE_PROJECT_ID
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const loginWithGoogle = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+
+    // Verify the token with Google
+    const googleResponse = await axios.get(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${token}`
+    );
+
+    const { email, name, picture } = googleResponse.data;
+    let user = await prisma.user.findUnique({ where: { email }, include: { medicalInfos: true } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          profileImage: picture,
+          medicalInfos: {
+            create: {}
+          },
+          password: "",
+          provider: "Google"
+        },
+        include: {
+          medicalInfos: true
+        }
+      })
+    }
+    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    return res.json({ user, token: accessToken });
+
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const updateUserDetails = async (req, res, next) => {
+  try {
+    const { password, name, phone, country } = req.body
+    let user = await prisma.user.update({
+      where: {
+        id: res.locals.user.id
+      }, data: {
+        name,
+        password: password ? await hash(password, 10) : undefined,
+        phone,
+        country
+      }, include: {
+        medicalInfos: true
+      }
+    })
+    if (req.files && req.files.image) {
+      await sharp(req.files.image.data).webp().resize({ width: 200, withoutEnlargement: true }).toFile(`./files/profiles/${user.id}.webp`)
+      user = await prisma.user.update({
+        where: {
+          id: res.locals.user.id
+        }, data: {
+          profileImage: `/profiles/${user.id}.webp`
+        }, include: {
+          medicalInfos: true
+        }
+      })
+    }
+    return res.json({ user })
+  } catch (error) {
+    next(error)
+  }
+}
+
