@@ -135,7 +135,7 @@ export const getAIAnalysis = async (req, res, next) => {
     if (data.err) {
       return res.status(400).json({ err: data.err })
     }
-    await prisma.symptomAnalysis.create({
+    const analysis = await prisma.symptomAnalysis.create({
       data: {
         user: {
           connect: {
@@ -148,7 +148,7 @@ export const getAIAnalysis = async (req, res, next) => {
         title: data.title
       }
     })
-    res.json({ data });
+    res.json({ data: analysis });
   } catch (error) {
     next(error)
   }
@@ -165,7 +165,7 @@ export const getAIPrescriptionSchedule = async (req, res, next) => {
         .toBuffer()
       imageBase64 = webpBuffer.toString('base64')
     }
-    const prescription = req.body.prescription ? JSON.parse(req.body.prescription) : "Check the attached image"
+    const prescription = req.body.prescriptions ? JSON.parse(req.body.prescriptions) : "Check the attached image"
     const response = await performPresriptionScheduling({ data: { prescription, user }, file: imageBase64, date: new Date().toDateString() })
     if (response.err) {
       return res.status(400).json({ err: response.err })
