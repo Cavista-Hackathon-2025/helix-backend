@@ -83,7 +83,7 @@ export const login = async (req, res, next) => {
 export const setMedicals = async (req, res, next) => {
   try {
     const user = res.locals.user
-    const { weight, height, blood_pressure, alergies, history } = req.body
+    const { weight, height, blood_pressure, alergies, history, age } = req.body
     console.log(req.body)
     await prisma.medicalInfo.updateMany({
       where: {
@@ -93,8 +93,8 @@ export const setMedicals = async (req, res, next) => {
         weight: weight ? Number(weight) : undefined,
         height: height ? Number(height) : undefined,
         blood_pressure,
-        alergies,
-        history: history ? JSON.parse(history) : undefined
+        alergies: alergies ? JSON.parse(alergies) : undefined,
+        history: history ? JSON.parse(history) : undefined,
       }
     })
     const updatedUser = await prisma.user.findUnique({
@@ -323,7 +323,7 @@ export const loginWithGoogle = async (req, res, next) => {
 
 export const updateUserDetails = async (req, res, next) => {
   try {
-    const { password, name, phone, country } = req.body
+    const { password, name, phone, country, age } = req.body
     let user = await prisma.user.update({
       where: {
         id: res.locals.user.id
@@ -331,7 +331,8 @@ export const updateUserDetails = async (req, res, next) => {
         name,
         password: password ? await hash(password, 10) : undefined,
         phone,
-        country
+        country,
+        age: age ? Number(age) : undefined
       }, include: {
         medicalInfos: true
       }
