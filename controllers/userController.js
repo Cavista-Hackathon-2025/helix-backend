@@ -249,3 +249,24 @@ export const fetchDiagnosisHistory = async (req, res, next) => {
     next(error)
   }
 }
+
+export const fetchSingleDignosisHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const { user } = res.locals
+    const diagnosis = await prisma.symptomAnalysis.findUnique({
+      where: {
+        id
+      }
+    })
+    if (!diagnosis) {
+      return res.status(404).json({ err: "Diagnosis not found" })
+    }
+    if (diagnosis.userId !== user.id) {
+      return res.status(401).json({ err: "You are not authorized to view this diagnosis" })
+    }
+    res.json({ diagnosis })
+  } catch (error) {
+    next(error)
+  }
+}
